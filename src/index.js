@@ -164,10 +164,36 @@ function parseJson(r) {
   return o;
 }
 
+async function callLlm(env, msgs, ms) {
+  if (env.GEMINI_API_KEY) {
+    const model = env.GEMINI_MODEL || 'gemini-2.5-flash';
+    const cfg = { temperature: 0, maxOutputTokens: 2000, responseMimeType: 'application/json' };
+    if (model.includes('2.5-flash') && !model.includes('lite')) cfg.thinkingConfig = { thinkingBudget: 0 };
+    const r = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', 'x-goog-api-key': env.GEMINI_API_KEY },
+      body: JSON.stringify({
+        systemInstruction: { parts: [{ text: msgs[0].content }] },
+        contents: [{ role: 'user', parts: [{ text: msgs[1].content }] }],
+        generationConfig: cfg,
+      }),
+      signal: AbortSignal.timeout(ms),
+    });
+    if (!r.ok) throw new Error('gemini_http_' + r.status);
+    const j = await r.json();
+    return ((j.candidates && j.candidates[0] && j.candidates[0].content.parts) || []).map((x) => x.text || '').join('');
+  }
+  const r = await Promise.race([
+    env.AI.run(env.MODEL || '@cf/meta/llama-3.3-70b-instruct-fp8-fast', { messages: msgs, max_tokens: 800, temperature: 0 }),
+    new Promise((_, rej) => setTimeout(() => rej(new Error('model_timeout')), ms)),
+  ]);
+  return r.response;
+}
+
 async function makePlan(env, body) {
   const t0 = Date.now();
   const { ids, text } = condense(body);
-  const model = env.MODEL || '@cf/meta/llama-3.3-70b-instruct-fp8-fast';
+  const model = env.GEMINI_API_KEY ? env.GEMINI_MODEL || 'gemini-2.5-flash' : env.MODEL || '@cf/meta/llama-3.3-70b-instruct-fp8-fast';
   const effects = new Set(body.policy.effectTools);
   const appr = new Set(body.policy.approvalRequiredFor || []);
   const tools = body.toolCatalog
@@ -182,16 +208,13 @@ async function makePlan(env, body) {
     if (left < 4000) break;
     try {
       const msgs = [{ role: 'system', content: SYSTEM }, { role: 'user', content: user + note }];
-      const r = await Promise.race([
-        env.AI.run(model, { messages: msgs, max_tokens: 800, temperature: 0 }),
-        new Promise((_, rej) => setTimeout(() => rej(new Error('model_timeout')), left)),
-      ]);
+      const r = await callLlm(env, msgs, left);
       const res = sanitize(parseJson(r), body, ids, i === 1);
       if (res.plan) plan = res.plan;
       else { note = `\n\nYour previous answer was rejected: ${res.err}. Answer again with corrected JSON only.`; console.log('plan_rejected', res.err); }
     } catch (e) {
       console.log('plan_error', String(e && e.message));
-      if (String(e && e.message) === 'model_timeout') break;
+      if (/timeout|aborted/i.test(String(e && e.message)) || /4006|gemini_http_(429|403|401)/.test(String(e && e.message))) break;
     }
   }
   let source = 'model';
