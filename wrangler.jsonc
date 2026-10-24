@@ -1,0 +1,9 @@
+{
+  "name": "incident-agent",
+  "main": "src/index.js",
+  "compatibility_date": "2025-09-01",
+  "ai": { "binding": "AI" },
+  "durable_objects": { "bindings": [{ "name": "RUN", "class_name": "RunDO" }] },
+  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["RunDO"] }],
+  "vars": { "MODEL": "@cf/meta/llama-3.3-70b-instruct-fp8-fast" }
+}
