@@ -181,7 +181,7 @@ async function callLlm(env, msgs, ms) {
       }),
       signal: AbortSignal.timeout(ms),
     });
-    if (!r.ok) throw new Error('gemini_http_' + r.status);
+    if (!r.ok) throw new Error('gemini_http_' + r.status + ' ' + (await r.text()).replace(/\s+/g, ' ').slice(0, 300));
     const j = await r.json();
     return ((j.candidates && j.candidates[0] && j.candidates[0].content.parts) || []).map((x) => x.text || '').join('');
   }
@@ -216,7 +216,7 @@ async function makePlan(env, body) {
       else { note = `\n\nYour previous answer was rejected: ${res.err}. Answer again with corrected JSON only.`; console.log('plan_rejected', res.err); }
     } catch (e) {
       console.log('plan_error', String(e && e.message));
-      if (/timeout|aborted/i.test(String(e && e.message)) || /4006|gemini_http_(429|403|401)/.test(String(e && e.message))) break;
+      if (/timeout|aborted/i.test(String(e && e.message)) || /4006|gemini_http_(429|403|401|404)/.test(String(e && e.message))) break;
     }
   }
   let source = 'model';
