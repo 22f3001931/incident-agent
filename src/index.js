@@ -1,4 +1,5 @@
 // Incident agent: Cloudflare Worker (router) + Durable Object (one per runId, persistent state).
+
 // Planning (model), state machine (receipts) and trace building are kept separate.
 
 const enc = new TextEncoder();
