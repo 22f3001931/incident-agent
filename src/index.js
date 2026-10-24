@@ -31,7 +31,7 @@ const handler = {
       env.RUN.get(env.RUN.idFromName(runId)).fetch('https://do' + path, { ...init, headers: fwd });
     let m;
     if (req.method === 'GET' && p === '/v2/health')
-      return json({ provider: env.GEMINI_API_KEY ? 'gemini' : 'workers-ai', model: env.GEMINI_API_KEY ? env.GEMINI_MODEL || 'gemini-2.5-flash' : env.MODEL || null });
+      return json({ provider: env.GEMINI_API_KEY ? 'gemini' : 'workers-ai', model: env.GEMINI_API_KEY ? env.GEMINI_MODEL || 'gemini-3.5-flash-lite' : env.MODEL || null });
     if (req.method === 'POST' && p === '/v2/incidents') {
       const text = await req.text();
       let b;
@@ -168,7 +168,7 @@ function parseJson(r) {
 
 async function callLlm(env, msgs, ms) {
   if (env.GEMINI_API_KEY) {
-    const model = env.GEMINI_MODEL || 'gemini-2.5-flash';
+    const model = env.GEMINI_MODEL || 'gemini-3.5-flash-lite';
     const cfg = { temperature: 0, maxOutputTokens: 2000, responseMimeType: 'application/json' };
     if (model.includes('2.5-flash') && !model.includes('lite')) cfg.thinkingConfig = { thinkingBudget: 0 };
     const r = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`, {
@@ -195,7 +195,7 @@ async function callLlm(env, msgs, ms) {
 async function makePlan(env, body) {
   const t0 = Date.now();
   const { ids, text } = condense(body);
-  const model = env.GEMINI_API_KEY ? env.GEMINI_MODEL || 'gemini-2.5-flash' : env.MODEL || '@cf/meta/llama-3.3-70b-instruct-fp8-fast';
+  const model = env.GEMINI_API_KEY ? env.GEMINI_MODEL || 'gemini-3.5-flash-lite' : env.MODEL || '@cf/meta/llama-3.3-70b-instruct-fp8-fast';
   const effects = new Set(body.policy.effectTools);
   const appr = new Set(body.policy.approvalRequiredFor || []);
   const tools = body.toolCatalog
