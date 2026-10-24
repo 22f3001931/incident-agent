@@ -5,5 +5,5 @@
   "ai": { "binding": "AI" },
   "durable_objects": { "bindings": [{ "name": "RUN", "class_name": "RunDO" }] },
   "migrations": [{ "tag": "v1", "new_sqlite_classes": ["RunDO"] }],
-  "vars": { "MODEL": "@cf/meta/llama-3.3-70b-instruct-fp8-fast" }
+  "vars": { "GEMINI_MODEL": "gemini-2.5-flash", "MODEL": "@cf/meta/llama-3.3-70b-instruct-fp8-fast" }
 }
