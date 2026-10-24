@@ -30,6 +30,8 @@ const handler = {
     const to = (runId, path, init) =>
       env.RUN.get(env.RUN.idFromName(runId)).fetch('https://do' + path, { ...init, headers: fwd });
     let m;
+    if (req.method === 'GET' && p === '/v2/health')
+      return json({ provider: env.GEMINI_API_KEY ? 'gemini' : 'workers-ai', model: env.GEMINI_API_KEY ? env.GEMINI_MODEL || 'gemini-2.5-flash' : env.MODEL || null });
     if (req.method === 'POST' && p === '/v2/incidents') {
       const text = await req.text();
       let b;
