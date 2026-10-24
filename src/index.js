@@ -1,5 +1,4 @@
 // Incident agent: Cloudflare Worker (router) + Durable Object (one per runId, persistent state).
-
 // Planning (model), state machine (receipts) and trace building are kept separate.
 
 const enc = new TextEncoder();
@@ -23,7 +22,7 @@ const json = (o, s = 200) => new Response(JSON.stringify(o), { status: s, header
 const raw = (str, s = 200) => new Response(str, { status: s, headers: H });
 
 // ---------------------------------------------------------------- router
-export default {
+const handler = {
   async fetch(req, env) {
     const p = new URL(req.url).pathname.replace(/\/+$/, '');
     const fwd = new Headers();
@@ -44,6 +43,14 @@ export default {
     if (req.method === 'GET' && (m = p.match(/^\/v2\/incidents\/([^/]+)$/)))
       return to(decodeURIComponent(m[1]), '/get', { method: 'GET' });
     return json({ error: 'not_found' }, 404);
+  },
+};
+
+export default {
+  async fetch(req, env) {
+    const res = await handler.fetch(req, env);
+    console.log('v3 http', req.method, new URL(req.url).pathname.replace(/^(\/v2\/incidents\/)[^/]+/, '$1:id'), res.status);
+    return res;
   },
 };
 
@@ -187,11 +194,13 @@ async function makePlan(env, body) {
       if (String(e && e.message) === 'model_timeout') break;
     }
   }
-  if (!plan) { console.log('plan_fallback_used'); plan = fallbackPlan(body, ids); }
+  let source = 'model';
+  if (!plan) { console.log('plan_fallback_used'); source = 'fallback'; plan = fallbackPlan(body, ids); }
   // keep canaries / sensitive values out of anything we store or export
   const secrets = [...Object.values(body.sensitive || {}), ...(body.policy.doNotExport || [])].filter((s) => typeof s === 'string' && s.length >= 4);
   let s = JSON.stringify(plan);
   for (const x of secrets) s = s.split(JSON.stringify(x).slice(1, -1)).join('');
+  console.log('plan_done', source, plan.rootCause, plan.diagnostics.map((d) => d.toolName).join(','), plan.effect.toolName, Date.now() - t0, 'ms');
   return { ...JSON.parse(s), model, startNs, endNs: nowNs() };
 }
 
@@ -346,7 +355,7 @@ export class RunDO {
       if (p === '/start') return await this.start(req);
       if (p === '/receipt') return await this.receipt(req);
       return await this.get();
-    } catch { return json({ error: 'internal_error' }, 500); }
+    } catch (e) { console.log('do_error', String((e && e.stack) || e)); return json({ error: 'internal_error' }, 500); }
   }
 
   async get() {
